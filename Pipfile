@@ -10,6 +10,7 @@ transformers = "*"
 matplotlib = "*"
 datasets = "*"
 evaluate = "*"
+vit-trainer = {file = ".", editable = true}
 
 [dev-packages]
 
