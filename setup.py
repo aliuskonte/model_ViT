@@ -22,7 +22,7 @@ setup(
         "evaluate",       # Модуль метрик 🤗
         "clearml"
     ],
-    python_requires=">=3.12",  # как в Pipfile
+    python_requires=">=3.10",  # как в Pipfile
     entry_points={
         "console_scripts": [
             # Создаём две команды CLI (дефис/подчёркивание)
