@@ -8,11 +8,13 @@ from typing import Any, Dict
 import numpy as np
 import torch
 from evaluate import load as load_metric
-from transformers import DataCollatorWithPadding, TrainingArguments
+from transformers import TrainingArguments
 
-from .data import get_datasets
+from .clearml_task import load_clearml_config
+from .data import get_datasets, _build_transform, collate_fn
+from datasets import load_dataset
 from .models import get_model, get_processor
-from weighted_trainer import WeightedTrainer
+from .weighted_trainer import WeightedTrainer
 from .utils import get_device, seed_everything, setup_logger
 
 __all__ = ["train", "evaluate"]
@@ -48,18 +50,24 @@ def train(
 ) -> Dict[str, Any]:
     """Обучаем ViT‑модель и возвращаем словарь метрик тренировки."""
 
+    load_clearml_config(epochs, seed, batch_size, data_dir)
+
     seed_everything(seed)
 
     processor = get_processor()
-    ds = get_datasets(data_dir, processor)
-    labels = ds["train"].features["label"].names
+    raw_ds = load_dataset("imagefolder", data_dir=str(data_dir))
+    labels = raw_ds["train"].features["label"].names
 
     # Вычисляем веса классов, если это требуется
     class_weights = None
+
     if use_weights:
-        counts = np.bincount(ds["train"]["label"])
+        counts = np.bincount(raw_ds["train"]["label"])
         class_weights = torch.tensor(1.0 / counts, dtype=torch.float32)
         logger.info("Веса классов: %s", class_weights.tolist())
+
+    # 3) Оборачиваем датасет трансформацией
+    ds = raw_ds.with_transform(_build_transform(processor))
 
     model = get_model(labels)
 
@@ -69,7 +77,7 @@ def train(
         per_device_eval_batch_size=batch_size,
         num_train_epochs=epochs,
         fp16=torch.cuda.is_available(),
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=100,
         save_steps=100,
         logging_steps=100,
@@ -78,7 +86,7 @@ def train(
         load_best_model_at_end=True,
         metric_for_best_model="eval_f1",
         greater_is_better=True,
-        report_to=["tensorboard"],
+        report_to=['clearml'],
         **kwargs,
     )
 
@@ -87,7 +95,7 @@ def train(
         args=training_args,
         train_dataset=ds["train"],
         eval_dataset=ds.get("validation", None),
-        data_collator=DataCollatorWithPadding(processor),
+        data_collator=collate_fn,
         tokenizer=processor,
         compute_metrics=_compute_metrics,
         class_weights=class_weights,
@@ -120,7 +128,7 @@ def evaluate(checkpoint: str | Path, data_dir: str | Path) -> Dict[str, Any]:
         model=model,
         args=TrainingArguments(output_dir="/tmp/eval", do_train=False, do_eval=True),
         eval_dataset=ds.get("validation", ds.get("test")),
-        data_collator=DataCollatorWithPadding(processor),
+        data_collator=collate_fn,
         tokenizer=processor,
         compute_metrics=_compute_metrics,
     )

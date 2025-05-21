@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Callable
+import torch
+from typing import Any, Dict, List
 
 from datasets import DatasetDict, load_dataset
 from transformers import ViTImageProcessor
@@ -28,3 +30,14 @@ def get_datasets(data_dir: str | Path, processor: ViTImageProcessor) -> DatasetD
 
     ds = load_dataset("imagefolder", data_dir=str(data_dir))
     return ds.with_transform(_build_transform(processor))
+
+
+def collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Собирает батч из пикселей и меток:
+      - pixel_values: [batch_size, 3, H, W]
+      - labels:       [batch_size]
+    """
+    pixel_values = torch.stack([example["pixel_values"] for example in batch])
+    labels = torch.tensor([example["labels"] for example in batch])
+    return {"pixel_values": pixel_values, "labels": labels}

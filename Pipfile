@@ -6,10 +6,15 @@ name = "pypi"
 [packages]
 requests = "*"
 torch = "*"
-transformers = "*"
+transformers = ">=4.41.0"
+accelerate = "*"
 matplotlib = "*"
 datasets = "*"
 evaluate = "*"
+scikit-learn = "*"
+click = "*"
+clearml = "*"
+python-dotenv = "*"
 vit-trainer = {file = ".", editable = true}
 
 [dev-packages]
