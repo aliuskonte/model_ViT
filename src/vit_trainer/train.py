@@ -60,9 +60,9 @@ def train(
     raw_ds = load_dataset(
         "imagefolder",
         data_files={
-            "train": str(Path(data_dir) / "train" / "**"),
-            "val": str(Path(data_dir) / "val" / "**"),
-            "test": str(Path(data_dir) / "test" / "**"),
+            "train": str(Path(data_dir) / "train" / "**/*"),
+            "val": str(Path(data_dir) / "val" / "**/*"),
+            "test": str(Path(data_dir) / "test" / "**/*"),
         },
     )
 
