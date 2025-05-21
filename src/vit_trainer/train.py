@@ -11,7 +11,7 @@ from evaluate import load as load_metric
 from transformers import TrainingArguments
 
 from .clearml_task import load_clearml_config
-from .data import get_datasets, _build_transform, collate_fn
+from .data import _build_transform, collate_fn
 from datasets import load_dataset
 from .models import get_model, get_processor
 from .weighted_trainer import WeightedTrainer
@@ -48,19 +48,28 @@ def train(
     use_weights: bool = True,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-    """Обучаем ViT‑модель и возвращаем словарь метрик тренировки."""
+    """Обучаем ViT-модель и возвращаем словарь метрик тренировки."""
 
     load_clearml_config(epochs, seed, batch_size, data_dir)
 
     seed_everything(seed)
 
     processor = get_processor()
-    raw_ds = load_dataset("imagefolder", data_dir=str(data_dir))
+
+    # Вместо только data_dir делаем явный указатель на папки train/validation
+    raw_ds = load_dataset(
+        "imagefolder",
+        data_files={
+            "train": str(Path(data_dir) / "train" / "**"),
+            "val": str(Path(data_dir) / "val" / "**"),
+            "test": str(Path(data_dir) / "test" / "**"),
+        },
+    )
+
     labels = raw_ds["train"].features["label"].names
 
     # Вычисляем веса классов, если это требуется
     class_weights = None
-
     if use_weights:
         counts = np.bincount(raw_ds["train"]["label"])
         class_weights = torch.tensor(1.0 / counts, dtype=torch.float32)
@@ -94,7 +103,7 @@ def train(
         model=model,
         args=training_args,
         train_dataset=ds["train"],
-        eval_dataset=ds.get("validation", None),
+        eval_dataset=ds.get("val", None),
         data_collator=collate_fn,
         tokenizer=processor,
         compute_metrics=_compute_metrics,
@@ -111,7 +120,15 @@ def evaluate(checkpoint: str | Path, data_dir: str | Path) -> Dict[str, Any]:
     """Оцениваем сохранённую модель на валидационном/тестовом датасете."""
 
     processor = get_processor()
-    ds = get_datasets(data_dir, processor)
+    raw_ds = load_dataset(
+                "imagefolder",
+                data_files = {
+                    "train": str(Path(data_dir) / "train" / "**"),
+                    "val": str(Path(data_dir) / "val" / "**"),
+                    "test": str(Path(data_dir) / "test" / "**"),
+        },
+        )
+    ds = raw_ds.with_transform(_build_transform(processor))
     labels = ds["train"].features["label"].names
 
     device = get_device()
@@ -125,11 +142,11 @@ def evaluate(checkpoint: str | Path, data_dir: str | Path) -> Dict[str, Any]:
         model.load_state_dict(state_dict)
 
     trainer = WeightedTrainer(
-        model=model,
-        args=TrainingArguments(output_dir="/tmp/eval", do_train=False, do_eval=True),
-        eval_dataset=ds.get("validation", ds.get("test")),
-        data_collator=collate_fn,
-        tokenizer=processor,
-        compute_metrics=_compute_metrics,
+        model = model,
+        args = TrainingArguments(output_dir="/tmp/eval", do_train=False, do_eval=True),
+        eval_dataset=ds.get("test", ds.get("val")),
+        data_collator = collate_fn,
+        tokenizer = processor,
+        compute_metrics = _compute_metrics,
     )
     return trainer.evaluate()

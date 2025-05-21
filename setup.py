@@ -7,7 +7,7 @@ setup(
     name="vit-trainer",
     version="0.1.0",
     description="Пакет для обучения ViT на несбалансированных датасетах изображений",
-    author="Your Name",
+    author="DM",
     author_email="you@example.com",
     # Указываем, что исходники лежат в папке src/
     package_dir={"": "src"},
