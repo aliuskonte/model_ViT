@@ -61,7 +61,7 @@ def train(
         "imagefolder",
         data_files={
             "train": str(Path(data_dir) / "train" / "**/*"),
-            "val": str(Path(data_dir) / "val" / "**/*"),
+            "validation": str(Path(data_dir) / "val" / "**/*"),
             "test": str(Path(data_dir) / "test" / "**/*"),
         },
     )
@@ -103,7 +103,7 @@ def train(
         model=model,
         args=training_args,
         train_dataset=ds["train"],
-        eval_dataset=ds.get("val", None),
+        eval_dataset=ds.get("validation", None),
         data_collator=collate_fn,
         tokenizer=processor,
         compute_metrics=_compute_metrics,
@@ -123,9 +123,9 @@ def evaluate(checkpoint: str | Path, data_dir: str | Path) -> Dict[str, Any]:
     raw_ds = load_dataset(
                 "imagefolder",
                 data_files = {
-                    "train": str(Path(data_dir) / "train" / "**"),
-                    "val": str(Path(data_dir) / "val" / "**"),
-                    "test": str(Path(data_dir) / "test" / "**"),
+                    "train": str(Path(data_dir) / "train" / "**/*"),
+                    "validation": str(Path(data_dir) / "val" / "**/*"),
+                    "test": str(Path(data_dir) / "test" / "**/*"),
         },
         )
     ds = raw_ds.with_transform(_build_transform(processor))
@@ -144,7 +144,7 @@ def evaluate(checkpoint: str | Path, data_dir: str | Path) -> Dict[str, Any]:
     trainer = WeightedTrainer(
         model = model,
         args = TrainingArguments(output_dir="/tmp/eval", do_train=False, do_eval=True),
-        eval_dataset=ds.get("test", ds.get("val")),
+        eval_dataset=ds.get("test", ds.get("validation")),
         data_collator = collate_fn,
         tokenizer = processor,
         compute_metrics = _compute_metrics,
